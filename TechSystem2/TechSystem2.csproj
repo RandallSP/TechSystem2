@@ -98,6 +98,7 @@
       <DependentUpon>Tecnicos.aspx</DependentUpon>
       <SubType>ASPXCodeBehind</SubType>
     </Compile>
+    <Compile Include="ConexionDB.cs" />
     <Compile Include="UsuarioDatos.cs" />
     <Compile Include="EquipoDatos.cs" />
     <Compile Include="TecnicoDatos.cs" />

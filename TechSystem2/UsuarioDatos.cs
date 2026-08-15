@@ -4,73 +4,189 @@ using System.Data.SqlClient;
 
 namespace TechSystem2
 {
-
-public class UsuarioDatos
-{
-    private string conexion = System.Configuration.ConfigurationManager.ConnectionStrings["ConexionDB"].ConnectionString;
-
-    public DataTable ListarTodos()
+    /// <summary>
+    /// Clase que maneja todas las operaciones de la tabla Usuarios.
+    /// Capa de datos: aqui van los SELECT, INSERT, UPDATE y DELETE.
+    /// Todas las consultas usan parametros para evitar inyeccion SQL.
+    /// </summary>
+    public class UsuarioDatos
     {
-        SqlConnection conn = new SqlConnection(conexion);
-        string query = "SELECT UsuarioID, Nombre, CorreoElectronico, Telefono FROM Usuarios ORDER BY Nombre";
-        SqlDataAdapter adapter = new SqlDataAdapter(query, conn);
-        DataTable tabla = new DataTable();
-        adapter.Fill(tabla);
-        conn.Close();
-        return tabla;
-    }
+        private ConexionDB conexionDB;
 
-    public DataTable Buscar(string texto)
-    {
-        SqlConnection conn = new SqlConnection(conexion);
-        string query = "SELECT UsuarioID, Nombre, CorreoElectronico, Telefono FROM Usuarios WHERE Nombre LIKE '%" + texto + "%' OR CorreoElectronico LIKE '%" + texto + "%' ORDER BY Nombre";
-        SqlDataAdapter adapter = new SqlDataAdapter(query, conn);
-        DataTable tabla = new DataTable();
-        adapter.Fill(tabla);
-        conn.Close();
-        return tabla;
-    }
+        public UsuarioDatos()
+        {
+            conexionDB = new ConexionDB();
+        }
 
-    public DataTable ObtenerPorId(int usuarioID)
-    {
-        SqlConnection conn = new SqlConnection(conexion);
-        string query = "SELECT UsuarioID, Nombre, CorreoElectronico, Telefono FROM Usuarios WHERE UsuarioID = " + usuarioID;
-        SqlDataAdapter adapter = new SqlDataAdapter(query, conn);
-        DataTable tabla = new DataTable();
-        adapter.Fill(tabla);
-        conn.Close();
-        return tabla;
-    }
+        /// <summary>
+        /// Obtiene todos los usuarios de la tabla Usuarios.
+        /// </summary>
+        public DataTable ListarTodos()
+        {
+            DataTable tabla = new DataTable();
 
-    public void Insertar(string nombre, string correo, string telefono)
-    {
-        SqlConnection conn = new SqlConnection(conexion);
-        conn.Open();
-        string query = "INSERT INTO Usuarios (Nombre, CorreoElectronico, Telefono) VALUES ('" + nombre + "', '" + correo + "', '" + telefono + "')";
-        SqlCommand cmd = new SqlCommand(query, conn);
-        cmd.ExecuteNonQuery();
-        conn.Close();
-    }
+            try
+            {
+                // consulta simple: trae todos los usuarios
+                string consulta = "SELECT UsuarioID, Nombre, CorreoElectronico, Telefono FROM Usuarios ORDER BY Nombre";
 
-    public void Actualizar(int usuarioID, string nombre, string correo, string telefono)
-    {
-        SqlConnection conn = new SqlConnection(conexion);
-        conn.Open();
-        string query = "UPDATE Usuarios SET Nombre = '" + nombre + "', CorreoElectronico = '" + correo + "', Telefono = '" + telefono + "' WHERE UsuarioID = " + usuarioID;
-        SqlCommand cmd = new SqlCommand(query, conn);
-        cmd.ExecuteNonQuery();
-        conn.Close();
-    }
+                conexionDB.Abrir();
+                SqlDataAdapter adaptador = new SqlDataAdapter(consulta, conexionDB.ObtenerConexion());
+                adaptador.Fill(tabla);
+            }
+            catch (Exception ex)
+            {
+                throw new Exception("Error al listar los usuarios: " + ex.Message);
+            }
+            finally
+            {
+                conexionDB.Cerrar();
+            }
 
-    public void Eliminar(int usuarioID)
-    {
-        SqlConnection conn = new SqlConnection(conexion);
-        conn.Open();
-        string query = "DELETE FROM Usuarios WHERE UsuarioID = " + usuarioID;
-        SqlCommand cmd = new SqlCommand(query, conn);
-        cmd.ExecuteNonQuery();
-        conn.Close();
-    }
-}
+            return tabla;
+        }
 
+        /// <summary>
+        /// Busca usuarios por nombre usando WHERE y LIKE.
+        /// Filtro: busca coincidencias parciales en el nombre.
+        /// </summary>
+        public DataTable Buscar(string texto)
+        {
+            DataTable tabla = new DataTable();
+
+            try
+            {
+                // consulta con WHERE y LIKE para el filtro de busqueda (con parametro)
+                string consulta = "SELECT UsuarioID, Nombre, CorreoElectronico, Telefono " +
+                                  "FROM Usuarios " +
+                                  "WHERE Nombre LIKE @Texto OR CorreoElectronico LIKE @Texto " +
+                                  "ORDER BY Nombre";
+
+                conexionDB.Abrir();
+                SqlCommand comando = new SqlCommand(consulta, conexionDB.ObtenerConexion());
+                comando.Parameters.AddWithValue("@Texto", "%" + texto + "%");
+                SqlDataAdapter adaptador = new SqlDataAdapter(comando);
+                adaptador.Fill(tabla);
+            }
+            catch (Exception ex)
+            {
+                throw new Exception("Error al buscar usuarios: " + ex.Message);
+            }
+            finally
+            {
+                conexionDB.Cerrar();
+            }
+
+            return tabla;
+        }
+
+        /// <summary>
+        /// Obtiene un usuario por su ID (para cargarlo en el formulario de edicion).
+        /// </summary>
+        public DataTable ObtenerPorId(int usuarioID)
+        {
+            DataTable tabla = new DataTable();
+
+            try
+            {
+                string consulta = "SELECT UsuarioID, Nombre, CorreoElectronico, Telefono " +
+                                  "FROM Usuarios WHERE UsuarioID = @UsuarioID";
+
+                conexionDB.Abrir();
+                SqlCommand comando = new SqlCommand(consulta, conexionDB.ObtenerConexion());
+                comando.Parameters.AddWithValue("@UsuarioID", usuarioID);
+                SqlDataAdapter adaptador = new SqlDataAdapter(comando);
+                adaptador.Fill(tabla);
+            }
+            catch (Exception ex)
+            {
+                throw new Exception("Error al obtener el usuario: " + ex.Message);
+            }
+            finally
+            {
+                conexionDB.Cerrar();
+            }
+
+            return tabla;
+        }
+
+        /// <summary>
+        /// Inserta un nuevo usuario en la base de datos.
+        /// </summary>
+        public void Insertar(string nombre, string correo, string telefono)
+        {
+            try
+            {
+                string consulta = "INSERT INTO Usuarios (Nombre, CorreoElectronico, Telefono) " +
+                                  "VALUES (@Nombre, @Correo, @Telefono)";
+
+                conexionDB.Abrir();
+                SqlCommand comando = new SqlCommand(consulta, conexionDB.ObtenerConexion());
+                comando.Parameters.AddWithValue("@Nombre", nombre);
+                comando.Parameters.AddWithValue("@Correo", correo);
+                comando.Parameters.AddWithValue("@Telefono", string.IsNullOrEmpty(telefono) ? (object)DBNull.Value : telefono);
+                comando.ExecuteNonQuery();
+            }
+            catch (Exception ex)
+            {
+                throw new Exception("Error al guardar el usuario: " + ex.Message);
+            }
+            finally
+            {
+                conexionDB.Cerrar();
+            }
+        }
+
+        /// <summary>
+        /// Actualiza un usuario existente en la base de datos.
+        /// </summary>
+        public void Actualizar(int usuarioID, string nombre, string correo, string telefono)
+        {
+            try
+            {
+                string consulta = "UPDATE Usuarios SET Nombre = @Nombre, CorreoElectronico = @Correo, " +
+                                  "Telefono = @Telefono WHERE UsuarioID = @UsuarioID";
+
+                conexionDB.Abrir();
+                SqlCommand comando = new SqlCommand(consulta, conexionDB.ObtenerConexion());
+                comando.Parameters.AddWithValue("@UsuarioID", usuarioID);
+                comando.Parameters.AddWithValue("@Nombre", nombre);
+                comando.Parameters.AddWithValue("@Correo", correo);
+                comando.Parameters.AddWithValue("@Telefono", string.IsNullOrEmpty(telefono) ? (object)DBNull.Value : telefono);
+                comando.ExecuteNonQuery();
+            }
+            catch (Exception ex)
+            {
+                throw new Exception("Error al actualizar el usuario: " + ex.Message);
+            }
+            finally
+            {
+                conexionDB.Cerrar();
+            }
+        }
+
+        /// <summary>
+        /// Elimina un usuario de la base de datos por su ID.
+        /// </summary>
+        public void Eliminar(int usuarioID)
+        {
+            try
+            {
+                string consulta = "DELETE FROM Usuarios WHERE UsuarioID = @UsuarioID";
+
+                conexionDB.Abrir();
+                SqlCommand comando = new SqlCommand(consulta, conexionDB.ObtenerConexion());
+                comando.Parameters.AddWithValue("@UsuarioID", usuarioID);
+                comando.ExecuteNonQuery();
+            }
+            catch (Exception ex)
+            {
+                throw new Exception("Error al eliminar el usuario: " + ex.Message);
+            }
+            finally
+            {
+                conexionDB.Cerrar();
+            }
+        }
+    }
 }
